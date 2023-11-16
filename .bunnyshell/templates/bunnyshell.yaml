@@ -1,0 +1,192 @@
+kind: Environment
+type: primary
+environmentVariables:
+    SECRET: '<<BNS_SECRET>>'
+    TARGETPLATFORM: linux/amd64
+components:
+    -
+        kind: Terraform
+        name: password
+        gitRepo: 'https://github.com/bunnyshell/templates.git'
+        gitBranch: tf-password-generator/v0.1.0
+        gitApplicationPath: components/tf-password-generator
+        runnerImage: 'hashicorp/terraform:1.5'
+        deploy:
+            - 'cd components/tf-password-generator'
+            - '/bns/helpers/terraform/get_managed_backend > zz_backend_override.tf'
+            - 'terraform init -input=false -no-color'
+            - 'terraform apply -var "length=20" -var "min_special=5" -input=false -auto-approve -no-color'
+            - 'BNS_TF_STATE_LIST=`terraform show -json`'
+            - 'PASSWORD=`terraform output -raw password`'
+        destroy:
+            - 'cd components/tf-password-generator'
+            - '/bns/helpers/terraform/get_managed_backend > zz_backend_override.tf'
+            - 'terraform init -input=false -no-color'
+            - 'terraform destroy -var "length=20" -var "min_special=5" -input=false -auto-approve -no-color'
+        exportVariables:
+            - PASSWORD
+    -
+        kind: Database
+        name: db
+        gitRepo: 'https://github.com/alexo-bunnyshell/example-voting-app.git'
+        gitBranch: main
+        dockerCompose:
+            environment:
+                SECRET_ENV: '<<BNS_SECRET>>'
+                POSTGRES_PASSWORD: postgres
+                POSTGRES_USER: postgres
+            ports:
+                - '5432:5432'
+            healthcheck:
+                test:
+                    - CMD-SHELL
+                    - /healthchecks/postgres.sh
+                interval: 5s
+            image: 'postgres:15-alpine'
+        volumes:
+            -
+                name: db-data
+                mount: /var/lib/postgresql/data
+                subPath: ''
+    -
+        kind: Service
+        name: redis
+        gitRepo: 'https://github.com/alexo-bunnyshell/example-voting-app.git'
+        gitBranch: main
+        dockerCompose:
+            healthcheck:
+                test:
+                    - CMD-SHELL
+                    - /healthchecks/redis.sh
+                interval: 5s
+            image: 'redis:alpine'
+            ports:
+                - '6379:6379'
+    -
+        kind: Application
+        name: result
+        gitRepo: 'https://github.com/alexo-bunnyshell/example-voting-app.git'
+        gitBranch: main
+        gitApplicationPath: result
+        dockerCompose:
+            build:
+                context: ./result
+                dockerfile: Dockerfile
+                args:
+                    SECRET_ARG: '{{env.vars.SECRET}}'
+            entrypoint:
+                - nodemon
+                - server.js
+            ports:
+                - '80:80'
+                - '5858:5858'
+        hosts:
+            -
+                hostname: 'result-{{ env.base_domain }}'
+                path: /
+                servicePort: 80
+    -
+        kind: Application
+        name: vote
+        gitRepo: 'https://github.com/alexo-bunnyshell/example-voting-app.git'
+        gitBranch: main
+        gitApplicationPath: vote
+        dockerCompose:
+            build:
+                context: ./vote
+                dockerfile: Dockerfile
+            command:
+                - python
+                - app.py
+            healthcheck:
+                test:
+                    - CMD
+                    - curl
+                    - '-f'
+                    - 'http://localhost'
+                timeout: 5s
+                interval: 15s
+                retries: 3
+                start_period: 10s
+            ports:
+                - '80:80'
+        hosts:
+            -
+                hostname: 'vote-{{ env.base_domain }}'
+                path: /
+                servicePort: 80
+            -
+                hostname: '*.vote-{{ env.base_domain }}'
+                path: /
+                servicePort: 80
+    -
+        kind: Application
+        name: worker
+        gitRepo: 'https://github.com/alexo-bunnyshell/example-voting-app.git'
+        gitBranch: main
+        gitApplicationPath: worker
+        dockerCompose:
+            build:
+                context: ./worker
+                dockerfile: Dockerfile
+                args:
+                    TARGETPLATFORM: '{{ env.vars.TARGETPLATFORM}}'
+    -
+        kind: Application
+        name: express-app
+        gitRepo: 'https://github.com/alexo-bunnyshell/eaas-demonstrator.git'
+        gitBranch: main
+        gitApplicationPath: /
+        dockerCompose:
+            build:
+                context: .
+                dockerfile: Dockerfile
+            environment:
+                APP_DEBUG: 'true'
+                APP_SECRET: 'my name is NEO'
+            ports:
+                - '3000:3000'
+        hosts:
+            -
+                hostname: 'express-app-{{ env.base_domain }}'
+                path: /
+                servicePort: 3000
+volumes:
+    -
+        name: db-data
+        size: 1Gi
+        type: disk
+dev:
+    vote:
+        -
+            containers:
+                vote:
+                    command:
+                        - gunicorn
+                        - 'app:app'
+                        - '-b'
+                        - '0.0.0.0:80'
+                        - '--log-file'
+                        - '-'
+                        - '--access-logfile'
+                        - '-'
+                        - '--workers'
+                        - '4'
+                        - '--keep-alive'
+                        - '0'
+                        - '--reload'
+                    syncPaths:
+                        -
+                            remotePath: /app
+                            localPath: .
+    result:
+        -
+            containers:
+                result:
+                    command:
+                        - nodemon
+                        - server.js
+                    syncPaths:
+                        -
+                            remotePath: /app
+                            localPath: .
