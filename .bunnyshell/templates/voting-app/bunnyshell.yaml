@@ -2,7 +2,7 @@ kind: Environment
 name: template-env
 type: primary
 environmentVariables:
-    SECRET: '<<BNS_SECRET>>'
+    SECRET: 'bns_secret(valueForEnvSecret)'
     TARGETPLATFORM: linux/amd64
 components:
     -
@@ -33,7 +33,7 @@ components:
         gitBranch: main
         dockerCompose:
             environment:
-                SECRET_ENV: '<<BNS_SECRET>>'
+                SECRET_ENV: 'bns_secret(valueForComponentSecret)'
                 POSTGRES_PASSWORD: postgres
                 POSTGRES_USER: postgres
             ports:
