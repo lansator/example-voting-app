@@ -1,4 +1,5 @@
 kind: Environment
+name: template-env
 type: primary
 environmentVariables:
     SECRET: '<<BNS_SECRET>>'
