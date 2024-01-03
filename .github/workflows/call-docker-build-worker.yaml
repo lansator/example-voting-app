@@ -10,13 +10,13 @@ on:
     paths:
       - 'worker/**'
       - '.github/workflows/call-docker-build-worker.yaml'
-  pull_request:
-    branches:
-      - 'main'
-    # only build when important files change
-    paths:
-      - 'worker/**'
-      - '.github/workflows/call-docker-build-worker.yaml'
+  #pull_request:
+  #  branches:
+  #    - 'main'
+  #  # only build when important files change
+  #  paths:
+  #    - 'worker/**'
+  #    - '.github/workflows/call-docker-build-worker.yaml'
 
 jobs:
   call-docker-build:
