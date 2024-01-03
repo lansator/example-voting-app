@@ -10,13 +10,13 @@ on:
     paths:
       - 'vote/**'
       - '.github/workflows/call-docker-build-vote.yaml'
-  pull_request:
-    branches:
-      - 'main'
-    # only build when important files change
-    paths:
-      - 'vote/**'
-      - '.github/workflows/call-docker-build-vote.yaml'
+  #pull_request:
+  #  branches:
+  #    - 'main'
+  #  # only build when important files change
+  #  paths:
+  #    - 'vote/**'
+  #    - '.github/workflows/call-docker-build-vote.yaml'
 
 jobs:
   call-docker-build:
