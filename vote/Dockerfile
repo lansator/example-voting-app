@@ -16,6 +16,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Define a stage specifically for development, where it'll watch for
 # filesystem changes
 FROM base AS dev
+# Copy our code from the current folder to the working directory inside the container
+COPY . .
 RUN pip install watchdog
 ENV FLASK_ENV=development
 CMD ["python", "app.py"]
